@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "daybreak.mcp_server.server"]
+    ports:
+      - "8000:8000"
+    environment:
+      - STORAGE=memory
+      - PORT=8000
+      - HOST=0.0.0.0
+    restart: unless-stopped
+
+  ui-simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "daybreak.ui.app"]
+    ports:
+      - "3000:3000"
+    environment:
+      - MCP_URL=http://mcp-server:8000/mcp
+      - UI_PORT=3000
+      - UI_HOST=0.0.0.0
+    depends_on:
+      - mcp-server
+    restart: unless-stopped

@@ -1,0 +1,1 @@
+"""MyAlexa MCP Server Package."""

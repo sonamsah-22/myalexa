@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MyAlexa - Voice-First Alexa+ Daily Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #080b12;
+      --panel-bg: rgba(18, 24, 38, 0.75);
+      --panel-border: rgba(255, 255, 255, 0.1);
+      --accent-cyan: #00f2fe;
+      --accent-blue: #4facfe;
+      --accent-purple: #7f00ff;
+      --text-main: #f0f4fc;
+      --text-muted: #94a3b8;
+      --user-msg: linear-gradient(135deg, #2563eb, #1d4ed8);
+      --alexa-msg: rgba(30, 41, 59, 0.85);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 20%, rgba(0, 242, 254, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(127, 0, 255, 0.06) 0%, transparent 40%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    header {
+      padding: 1.2rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--panel-border);
+      backdrop-filter: blur(12px);
+      background: rgba(8, 11, 18, 0.8);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+    }
+
+    .logo-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #ffffff, var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge-simulated {
+      background: rgba(0, 242, 254, 0.12);
+      border: 1px solid rgba(0, 242, 254, 0.3);
+      color: var(--accent-cyan);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .main-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      height: calc(100vh - 75px);
+    }
+
+    @media (max-width: 1024px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+    }
+
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 1.5rem;
+    }
+
+    .transcript-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      scroll-behavior: smooth;
+    }
+
+    .bubble {
+      max-width: 75%;
+      padding: 1rem 1.3rem;
+      border-radius: 18px;
+      font-size: 1rem;
+      line-height: 1.5;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .user-bubble {
+      align-self: flex-end;
+      background: var(--user-msg);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.25);
+    }
+
+    .alexa-bubble {
+      align-self: flex-start;
+      background: var(--alexa-msg);
+      border: 1px solid var(--panel-border);
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    .alexa-bubble::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border-radius: 18px;
+      border-bottom-left-radius: 4px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(0, 242, 254, 0.4), transparent);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
+
+    .sender-tag {
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Voice & Interaction Control Section */
+    .controls-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 1rem;
+      gap: 1.2rem;
+    }
+
+    /* Mic Ring Animation States */
+    .mic-wrapper {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .mic-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* State: IDLE */
+    .mic-ring.idle {
+      border: 2px solid rgba(0, 242, 254, 0.3);
+      box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
+    }
+
+    /* State: LISTENING */
+    .mic-ring.listening {
+      border: 3px solid var(--accent-cyan);
+      box-shadow: 0 0 35px var(--accent-cyan);
+      animation: pulseCyan 1.4s infinite alternate;
+    }
+
+    @keyframes pulseCyan {
+      from { transform: scale(1); box-shadow: 0 0 20px var(--accent-cyan); }
+      to { transform: scale(1.15); box-shadow: 0 0 45px var(--accent-cyan); }
+    }
+
+    /* State: THINKING */
+    .mic-ring.thinking {
+      border: 3px solid transparent;
+      background: linear-gradient(var(--bg-dark), var(--bg-dark)) padding-box,
+                  linear-gradient(45deg, var(--accent-cyan), var(--accent-purple), var(--accent-blue)) border-box;
+      animation: rotateGrad 1.2s linear infinite;
+    }
+
+    @keyframes rotateGrad {
+      0% { transform: rotate(0deg) scale(1.05); }
+      100% { transform: rotate(360deg) scale(1.05); }
+    }
+
+    /* State: SPEAKING */
+    .mic-ring.speaking {
+      border: 3px solid var(--accent-blue);
+      box-shadow: 0 0 30px var(--accent-blue);
+      animation: wavePulse 0.8s infinite alternate;
+    }
+
+    @keyframes wavePulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      100% { transform: scale(1.1); opacity: 1; }
+    }
+
+    .mic-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 2;
+      transition: transform 0.2s ease;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .mic-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .mic-btn svg {
+      width: 32px;
+      height: 32px;
+      fill: currentColor;
+    }
+
+    .state-label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--accent-cyan);
+      min-height: 20px;
+    }
+
+    /* Chips container */
+    .chips-container {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .chip {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid var(--panel-border);
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      padding: 8px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .chip:hover {
+      background: rgba(0, 242, 254, 0.15);
+      border-color: rgba(0, 242, 254, 0.4);
+      color: #fff;
+    }
+
+    /* Text input bar fallback */
+    .input-bar {
+      display: flex;
+      width: 100%;
+      gap: 10px;
+      background: rgba(18, 24, 38, 0.8);
+      border: 1px solid var(--panel-border);
+      border-radius: 30px;
+      padding: 6px 6px 6px 18px;
+    }
+
+    .input-bar input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-size: 0.95rem;
+    }
+
+    .send-btn {
+      background: var(--accent-cyan);
+      color: #080b12;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .send-btn:hover {
+      opacity: 0.9;
+    }
+
+    /* Side Panel: MCP Tool Call Inspector */
+    .inspector-panel {
+      background: var(--panel-bg);
+      border-left: 1px solid var(--panel-border);
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem;
+      gap: 1rem;
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 0.8rem;
+    }
+
+    .panel-icon {
+      color: var(--accent-cyan);
+    }
+
+    .tool-card {
+      background: rgba(10, 14, 23, 0.9);
+      border: 1px solid rgba(0, 242, 254, 0.2);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tool-name-tag {
+      display: inline-block;
+      align-self: flex-start;
+      background: rgba(127, 0, 255, 0.2);
+      color: #c084fc;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: monospace;
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(127, 0, 255, 0.4);
+    }
+
+    .json-code {
+      background: rgba(0, 0, 0, 0.5);
+      color: #7dd3fc;
+      font-family: monospace;
+      font-size: 0.8rem;
+      padding: 10px;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+
+    .tool-result {
+      font-size: 0.85rem;
+      color: #a7f3d0;
+      background: rgba(6, 78, 59, 0.2);
+      padding: 8px 10px;
+      border-radius: 6px;
+      border-left: 3px solid #10b981;
+    }
+
+    .empty-inspector {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      text-align: center;
+      margin-top: 2rem;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo-container">
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+        </svg>
+      </div>
+      <div class="logo-title">MyAlexa</div>
+    </div>
+    <div class="badge-simulated">Simulated Alexa+ experience</div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Chat & Voice Center -->
+    <div class="chat-container">
+      <div class="transcript-area" id="transcript">
+        <div class="bubble alexa-bubble">
+          <div class="sender-tag">Daybreak Alexa+</div>
+          Hello! I'm your voice-first daily planner. Click the mic or pick a prompt below to get started.
+        </div>
+      </div>
+
+      <!-- Controls Section -->
+      <div class="controls-section">
+        <div class="mic-wrapper">
+          <div class="mic-ring idle" id="micRing"></div>
+          <button class="mic-btn" id="micBtn" onclick="toggleListening()">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="state-label" id="stateLabel">Tap mic to speak</div>
+
+        <!-- Chips -->
+        <div class="chips-container">
+          <div class="chip" onclick="sendPrompt('Add a task to call the dentist')">"Add a task to call the dentist"</div>
+          <div class="chip" onclick="sendPrompt('What\'s my day look like?')">"What's my day look like?"</div>
+          <div class="chip" onclick="sendPrompt('Plan my afternoon')">"Plan my afternoon"</div>
+        </div>
+
+        <!-- Text Input Bar -->
+        <div class="input-bar">
+          <input type="text" id="userInput" placeholder="Type a spoken command..." onkeypress="handleKeyPress(event)" />
+          <button class="send-btn" onclick="submitText()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Side Panel: MCP Tool Call Inspector -->
+    <div class="inspector-panel" id="inspector">
+      <div class="panel-header">
+        <span class="panel-icon">⚡</span>
+        <span>MCP Tool Call Inspector</span>
+      </div>
+      <div id="inspectorContent">
+        <div class="empty-inspector">
+          No MCP tools executed yet.<br/>
+          Speak or send a command to see live tool calls and argument resolution.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let isListening = false;
+    let recognition = null;
+    let isSpeaking = false;
+
+    // Initialize Web Speech API if supported
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setMicState('listening', 'Listening...');
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById('userInput').value = transcript;
+        sendPrompt(transcript);
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        setMicState('idle', 'Tap mic to speak');
+      };
+
+      recognition.onend = () => {
+        if (!isSpeaking) {
+          setMicState('idle', 'Tap mic to speak');
+        }
+      };
+    }
+
+    function setMicState(state, labelText) {
+      const ring = document.getElementById('micRing');
+      const label = document.getElementById('stateLabel');
+      
+      ring.className = 'mic-ring ' + state;
+      label.textContent = labelText;
+    }
+
+    function toggleListening() {
+      if (!recognition) {
+        alert("Speech recognition is not supported in this browser. Please use the text input below.");
+        return;
+      }
+      
+      if (isListening) {
+        recognition.stop();
+        isListening = false;
+        setMicState('idle', 'Tap mic to speak');
+      } else {
+        try {
+          recognition.start();
+          isListening = true;
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+
+    function handleKeyPress(e) {
+      if (e.key === 'Enter') {
+        submitText();
+      }
+    }
+
+    function submitText() {
+      const input = document.getElementById('userInput');
+      const text = input.value.strip ? input.value.strip() : input.value.trim();
+      if (text) {
+        sendPrompt(text);
+        input.value = '';
+      }
+    }
+
+    async function sendPrompt(text) {
+      if (!text) return;
+      
+      // Append user bubble
+      appendBubble('You', text, 'user-bubble');
+      setMicState('thinking', 'Alexa thinking...');
+
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: text })
+        });
+        
+        const data = await res.json();
+        const responseText = data.response || "No response received.";
+        
+        // Append Alexa bubble
+        appendBubble('Daybreak Alexa+', responseText, 'alexa-bubble');
+        
+        // Update MCP Inspector panel
+        updateInspector(data.tool_calls);
+        
+        // Speak output
+        speakText(responseText);
+
+      } catch (err) {
+        console.error(err);
+        appendBubble('Daybreak Alexa+', "Sorry, I ran into an error connecting to the server.", 'alexa-bubble');
+        setMicState('idle', 'Tap mic to speak');
+      }
+    }
+
+    function appendBubble(sender, text, className) {
+      const container = document.getElementById('transcript');
+      const bubble = document.createElement('div');
+      bubble.className = `bubble ${className}`;
+      bubble.innerHTML = `<div class="sender-tag">${sender}</div>${text}`;
+      container.appendChild(bubble);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function updateInspector(toolCalls) {
+      const container = document.getElementById('inspectorContent');
+      if (!toolCalls || toolCalls.length === 0) {
+        return;
+      }
+
+      container.innerHTML = '';
+      toolCalls.forEach(call => {
+        const card = document.createElement('div');
+        card.className = 'tool-card';
+        card.innerHTML = `
+          <div class="tool-name-tag">TOOL: ${call.name}</div>
+          <div class="json-code">Arguments:\n${JSON.stringify(call.args, null, 2)}</div>
+          <div class="tool-result">Result: ${call.result || 'Executed successfully'}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function speakText(text) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel(); // Stop any active speech
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        utterance.onstart = () => {
+          isSpeaking = true;
+          setMicState('speaking', 'Alexa speaking...');
+        };
+
+        utterance.onend = () => {
+          isSpeaking = false;
+          setMicState('idle', 'Tap mic to speak');
+        };
+
+        utterance.onerror = () => {
+          isSpeaking = false;
+          setMicState('idle', 'Tap mic to speak');
+        };
+
+        window.speechSynthesis.speak(utterance);
+      } else {
+        setMicState('idle', 'Tap mic to speak');
+      }
+    }
+  </script>
+</body>
+</html>
